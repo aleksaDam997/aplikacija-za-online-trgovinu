@@ -4,6 +4,9 @@ import { Administrator } from 'entities/Administrator.entity';
 import { Repository } from 'typeorm';
 import { AddAdministratorDto } from 'src/dtos/administrator/add.administrator.dto';
 import { EditAdministratorDto } from 'src/dtos/administrator/edit.administrator.dto';
+import { ApiResponse } from 'misc/api.response.class';
+import { resolve } from 'dns';
+import { response } from 'express';
 
 @Injectable()
 export class AdministratorService {
@@ -23,7 +26,7 @@ export class AdministratorService {
         return this.administrator.findOne(id);
     }
 
-    add(data: AddAdministratorDto): Promise<Administrator>{
+    add(data: AddAdministratorDto): Promise<Administrator | ApiResponse>{
         const crypto = require('crypto');
 
         const passwordhash = crypto.createHash('sha512');
@@ -34,12 +37,24 @@ export class AdministratorService {
         admin.username = data.username;
         admin.passwordHash = passHashString;
 
-        return this.administrator.save(admin);
+        return new Promise((resolve) =>{
+            this.administrator.save(admin)
+            .then(data => resolve(data)).catch(error =>{
+            const response = new ApiResponse('error', -1001);
+            resolve(response);
+            }); 
+        });
 
     }
 
-    async editById(adminId: number, data: EditAdministratorDto): Promise<Administrator>{
+    async editById(adminId: number, data: EditAdministratorDto): Promise<Administrator | ApiResponse>{
         let admin: Administrator = await this.administrator.findOne(adminId);
+
+        if(admin === undefined){
+            return new Promise((resolve) =>{
+                resolve(new ApiResponse("error", -1002));
+            })
+        }
 
         const crypt = require('crypto');
         const passHash = crypt.createHash('sha512');
