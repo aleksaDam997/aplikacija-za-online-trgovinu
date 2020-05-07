@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './controllers/app.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseConfiguration } from 'config/database.configuration';
 import { Administrator } from 'entities/Administrator.entity';
@@ -15,6 +14,10 @@ import { Order } from 'entities/order.entity';
 import { Photo } from 'entities/photo.entity';
 import { User } from 'entities/user.entity';
 import { AdministratorController } from './controllers/api/administrator.controller';
+import { CategoryController } from './controllers/api/category.controller';
+import { CategoryService } from './services/category/category.service';
+import { ArticleService } from './services/article/article.service';
+import { ArticleController } from './controllers/api/article.controller';
 
 DatabaseConfiguration
 
@@ -29,9 +32,9 @@ DatabaseConfiguration
       database: DatabaseConfiguration.database,
       entities: [Administrator, ArticleFeature, ArticlePrice, Article, CartArticle, Cart, Category, Feature, Order, Photo, User]
     }),
-    TypeOrmModule.forFeature([Administrator])
+    TypeOrmModule.forFeature([Administrator, ArticleFeature, ArticlePrice, Article, CartArticle, Cart, Category, Feature, Order, Photo, User])
   ],
-  controllers: [AppController, AdministratorController],
-  providers: [AdministratorService],
+  controllers: [AdministratorController, CategoryController, ArticleController],
+  providers: [AdministratorService, CategoryService, ArticleService],
 })
 export class AppModule {}
