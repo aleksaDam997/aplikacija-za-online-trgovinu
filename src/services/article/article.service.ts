@@ -11,13 +11,13 @@ import { ArticleFeature } from "entities/article-feature.entity";
 export class ArticleService extends TypeOrmCrudService<Article>{
     constructor(
         @InjectRepository(Article)
-        private readonly article: Repository<Article>,
+        private article: Repository<Article>,
         
         @InjectRepository(ArticlePrice)
-        private readonly articlePrice: Repository<ArticlePrice>,
+        private articlePrice: Repository<ArticlePrice>,
         
         @InjectRepository(ArticleFeature)
-        private readonly articleFeature: Repository<ArticleFeature>){
+        private articleFeature: Repository<ArticleFeature>){
             super(article);
         }
 

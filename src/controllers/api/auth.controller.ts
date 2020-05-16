@@ -39,10 +39,10 @@ async doLogin(@Body() data: LoginAdministratorDto, @Req() req: Request): Promise
 
     let sada: Date = new Date();
     sada.setDate(sada.getDate() + 14);
-    console.log(sada);
+    // console.log(sada);
     const istekTimeStamp = sada.getTime() / 1000;
     jwtData.exp = istekTimeStamp;
-    console.log(jwtData.exp);
+    // console.log(jwtData.exp);
     jwtData.ip = req.ip.toString();
     jwtData.ua = req.headers["user-agent"];
 
@@ -51,7 +51,7 @@ async doLogin(@Body() data: LoginAdministratorDto, @Req() req: Request): Promise
     const token = jwt.sign(JSON.parse(JSON.stringify(jwtData)), jwtSecret);
 
     const responseObject: LoginInfoAdministratorDto = new LoginInfoAdministratorDto(admin.administratorId, admin.username, token);
-    console.log(responseObject);
+    // console.log(responseObject);
     return new Promise(response => response(responseObject));
 }
 
