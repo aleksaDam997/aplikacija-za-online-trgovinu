@@ -22,12 +22,10 @@ export class AuthMiddleware implements NestMiddleware{
         }
 
         const tokenString = tokenParts[1];
-
+        
         const jwtData: JwtDataAdministratorDto = jwt.verify(tokenString, jwtSecret, function(err, decoded){
             if(err){
-                console.log(err.name);
-                console.log(err.message);
-                console.log(err.expiredAt);
+                throw new HttpException('Bad token found no jwt data!', HttpStatus.UNAUTHORIZED);
             }
             return decoded;
         });

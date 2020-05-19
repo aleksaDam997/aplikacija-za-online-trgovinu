@@ -48,7 +48,8 @@ async doLogin(@Body() data: LoginAdministratorDto, @Req() req: Request): Promise
 
     // const jwt = require('jsonwebtoken');
 
-    const token = jwt.sign(JSON.parse(JSON.stringify(jwtData)), jwtSecret);
+    const token = jwt.sign(jwtData.toPlainObject(), jwtSecret);
+    //JSON.parse(JSON.stringify(jwtData)) ako nece jwtData.toPlainObject()
 
     const responseObject: LoginInfoAdministratorDto = new LoginInfoAdministratorDto(admin.administratorId, admin.username, token);
     // console.log(responseObject);
