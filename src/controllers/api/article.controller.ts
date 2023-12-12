@@ -1,94 +1,133 @@
-import { Controller, Post, Body, Param, UseInterceptors, UploadedFile, Req } from "@nestjs/common";
+import { Controller, Post, Body, Param, UseInterceptors, UploadedFile, Req, Delete, Patch, UseGuards } from "@nestjs/common";
 import { Crud } from "@nestjsx/crud";
-import { ArticleService } from "src/services/article/article.service";
 import { Article } from "src/entities/article.entity";
+import { ArticleService } from "src/services/article/article.service";
 import { AddArticleDto } from "src/dtos/article/add.article.dto";
-import { FileInterceptor } from "@nestjs/platform-express";
-import { diskStorage } from "multer";
+import { FileInterceptor } from '@nestjs/platform-express';
 import { StorageConfig } from "config/storage.config";
-import { Photo } from "src/entities/photo.entity";
+import { diskStorage } from "multer";
 import { PhotoService } from "src/services/photo/photo.service";
-import { ApiResponse } from "misc/api.response.class";
-import * as fileType from "file-type";
-import * as fs from "fs";
-import * as sharp from "sharp";
+import { Photo } from "src/entities/photo.entity";
+import { ApiResponse } from "src/misc/api.response.class";
+import * as fileType from 'file-type';
+import * as fs from 'fs';
+import * as sharp from 'sharp';
+import { EditArticleDto } from "src/dtos/article/edit.article.dto";
+import { RoleCheckedGuard } from "src/misc/role.checker.guard";
+import { AllowToRoles } from "src/misc/allow.to.roles.descriptor";
+import { ArticleSearchDto } from "src/dtos/article/article.search.dto";
 
-@Controller('/api/article')
+@Controller('api/article')
 @Crud({
-    model:{
+    model: {
         type: Article
     },
-    params:{
-        articleId: {
-            field: 'article_id',
+    params: {
+        id: {
+            field: 'articleId',
             type: 'number',
-            primary: true, 
+            primary: true
         }
     },
-    query:{
-        join:{
+    query: {
+        join: {
             category: {
                 eager: true
             },
-            photos:{
+            photos: {
                 eager: true
             },
-            articlePrice: {
+            articlePrices: {
                 eager: true
             },
-            features:{
+            articleFeatures: {
+                eager: true
+            },
+            features: {
                 eager: true
             }
         }
-    }
+    },
+    routes: {
+        only: [
+            'getOneBase',
+            'getManyBase',
+        ],
+        getOneBase: {
+            decorators: [
+                UseGuards(RoleCheckedGuard),
+                AllowToRoles('administrator', 'user')
+            ],
+        },
+        getManyBase: {
+            decorators: [
+                UseGuards(RoleCheckedGuard),
+                AllowToRoles('administrator', 'user')
+            ],
+        },
+    },
 })
-export class ArticleController{
+export class ArticleController {
     constructor(
         public service: ArticleService,
-        public photoService: PhotoService
-    ){}
+        public photoService: PhotoService,
+    ) { }
 
-    @Post("/createFull")
-    createFullArticle(@Body() data: AddArticleDto){
+    @Post() // POST http://localhost:3000/api/article/
+    @UseGuards(RoleCheckedGuard)
+    @AllowToRoles('administrator')
+    createFullArticle(@Body() data: AddArticleDto) {
         return this.service.createFullArticle(data);
     }
 
-    @Post(':articleId/uploadPhoto')
+    @Patch(':id') // PATCH http://localhost:3000/api/article/2/
+    @UseGuards(RoleCheckedGuard)
+    @AllowToRoles('administrator')
+    editFullArticle(@Param('id') id: number, @Body() data: EditArticleDto) {
+        return this.service.editFullArticle(id, data);
+    }
+
+    @Post(':id/uploadPhoto/') // POST http://localhost:3000/api/article/:id/uploadPhoto/
+    @UseGuards(RoleCheckedGuard)
+    @AllowToRoles('administrator')
     @UseInterceptors(
         FileInterceptor('photo', {
             storage: diskStorage({
-                destination: StorageConfig.photo.destinaion,
-                filename: (req, file, callback) =>{
+                destination: StorageConfig.photo.destination,
+                filename: (req, file, callback) => {
                     let original: string = file.originalname;
-                    let normalized: string = original.replace(/\s+/g, '-');
-                    normalized.replace(/[^A-z0-9\.\-]/g, "");
 
-                    let randomNum: string = "";
+                    let normalized = original.replace(/\s+/g, '-');
+                    normalized = normalized.replace(/[^A-z0-9\.\-]/g, '');
+                    let sada = new Date();
+                    let datePart = '';
+                    datePart += sada.getFullYear().toString();
+                    datePart += (sada.getMonth() + 1).toString();
+                    datePart += sada.getDate().toString();
 
-                    for(let i: number = 0; i < 10; i++){
-                        randomNum += (Math.random() * 10).toFixed(0).toString();
-                    }
+                    let randomPart: string =
+                        new Array(10)
+                            .fill(0)
+                            .map(e => (Math.random() * 9).toFixed(0).toString())
+                            .join('');
 
-                    let now: Date = new Date();
-                    let datePart: string = "";
-                    datePart += now.getFullYear().toString();
-                    datePart += (now.getMonth() + 1).toString();
-                    datePart += now.getDate().toString();
-
-                    let fileName: string = datePart + "-" + randomNum + "-" + normalized;
+                    let fileName = datePart + '-' + randomPart + '-' + normalized;
+                    fileName = fileName.toLocaleLowerCase();
 
                     callback(null, fileName);
                 }
             }),
-            fileFilter: (req, file, callback) =>{
-                if(file.originalname.match(/\.(JPG|PNG)$/)){
-                    req.fileFilterError = "Bad file extension!";
+            fileFilter: (req, file, callback) => {
+                // 1. Check ekstenzije: JPG, PNG
+                if (!file.originalname.toLowerCase().match(/\.(jpg|png)$/)) {
+                    req.fileFilterError = 'Bad file extension!';
                     callback(null, false);
                     return;
                 }
 
-                if(!(file.mimetype.includes("jpeg") || file.mimetype.includes("png"))){
-                    req.fileFilterError = "Bad file content!";
+                // 2. Check tipa sadrzaja: image/jpeg, image/png (mimetype)
+                if (!(file.mimetype.includes('jpeg') || file.mimetype.includes('png'))) {
+                    req.fileFilterError = 'Bad file content type!';
                     callback(null, false);
                     return;
                 }
@@ -96,67 +135,109 @@ export class ArticleController{
                 callback(null, true);
             },
             limits: {
-                files: 1, 
-                fileSize: StorageConfig.photo.sizeLimit
-            }
+                files: 1,
+                fileSize: StorageConfig.photo.maxSize,
+            },
         })
     )
-    async uploadPhoto(@Param('articleId')articleId: number, @UploadedFile() photo, @Req() req): Promise<ApiResponse | Photo>{
-
-        if(req.fileFiltererror){
-            return new ApiResponse("error", -4002, req.fileFilterError);
+    async uploadPhoto(
+        @Param('id') articleId: number,
+        @UploadedFile() photo,
+        @Req() req
+    ): Promise<ApiResponse | Photo> {
+        if (req.fileFilterError) {
+            return new ApiResponse('error', -4002, req.fileFilterError);
         }
-        
-        if(!photo){
-            return new ApiResponse("error", -4002, "Photo not uploaded!");
+
+        if (!photo) {
+            return new ApiResponse('error', -4002, 'File not uploaded!');
         }
 
-        const fileTypeRes = await fileType.fromFile(photo.path);
-
-        if(!fileTypeRes){
+        const fileTypeResult = await fileType.fromFile(photo.path);
+        if (!fileTypeResult) {
             fs.unlinkSync(photo.path);
-            return new ApiResponse("error", -4002, "Cannot detect mime type!");
+            return new ApiResponse('error', -4002, 'Cannot detect file type!');
         }
 
-        const realMimeType = await fileTypeRes.mime;
-
-        if(!(realMimeType.includes("jpeg") || realMimeType.includes("png"))){
+        const realMimeType = fileTypeResult.mime;
+        if (!(realMimeType.includes('jpeg') || realMimeType.includes('png'))) {
             fs.unlinkSync(photo.path);
-            return new ApiResponse("error", -4002, "Bad file contenr type!");
-
+            return new ApiResponse('error', -4002, 'Bad file content type!');
         }
 
-        await this.createResizedImage(photo, StorageConfig.photo.small);
-        await this.createResizedImage(photo, StorageConfig.photo.thumb);
+        await this.createResizedImage(photo, StorageConfig.photo.resize.thumb);
+        await this.createResizedImage(photo, StorageConfig.photo.resize.small);
 
-        //TODO: real mime type check
-        // TODO: resize and save image
-
-        const newPhoto = new Photo();
+        const newPhoto: Photo = new Photo();
         newPhoto.articleId = articleId;
-        newPhoto.imagePath = photo.filename.toLowerCase();
+        newPhoto.imagePath = photo.filename;
 
         const savedPhoto = await this.photoService.add(newPhoto);
-
-        if(!savedPhoto){
-            return new ApiResponse("error", -4001);
+        if (!savedPhoto) {
+            return new ApiResponse('error', -4001);
         }
+
         return savedPhoto;
     }
 
-    async createResizedImage(photo, type){
-        const destinationName = StorageConfig.photo.destinaion + type.destination + photo.filename;
-        
-        sharp(photo.path).resize({
-            fit: "cover", //moze biti 'contain'
-            width: type.width,
-            height: type.height,
-            background: {
-                r: 255,
-                g: 255,
-                b: 255,
-                alpha: 0.0
-            }
-        }).toFile(destinationName);
+    async createResizedImage(photo, resizeSettings) {
+        const originalFilePath = photo.path;
+        const fileName = photo.filename;
+
+        const destinationFilePath =
+            StorageConfig.photo.destination +
+            resizeSettings.directory +
+            fileName;
+
+        await sharp(originalFilePath)
+            .resize({
+                fit: 'cover',
+                width: resizeSettings.width,
+                height: resizeSettings.height,
+            })
+            .toFile(destinationFilePath);
+    }
+
+    // http://localhost:3000/api/article/1/deletePhoto/45/
+    @Delete(':articleId/deletePhoto/:photoId')
+    @UseGuards(RoleCheckedGuard)
+    @AllowToRoles('administrator')
+    public async deletePhoto(
+        @Param('articleId') articleId: number,
+        @Param('photoId') photoId: number,
+    ) {
+        const photo = await this.photoService.findOne({
+            articleId: articleId,
+            photoId: photoId
+        });
+
+        if (!photo) {
+            return new ApiResponse('error', -4004, 'Photo not found!');
+        }
+
+        try {
+            fs.unlinkSync(StorageConfig.photo.destination + photo.imagePath);
+            fs.unlinkSync(StorageConfig.photo.destination +
+                        StorageConfig.photo.resize.thumb.directory +
+                        photo.imagePath);
+            fs.unlinkSync(StorageConfig.photo.destination +
+                        StorageConfig.photo.resize.small.directory +
+                        photo.imagePath);
+        } catch (e) { }
+
+        const deleteResult = await this.photoService.deleteById(photoId);
+
+        if (deleteResult.affected === 0) {
+            return new ApiResponse('error', -4004, 'Photo not found!');
+        }
+
+        return new ApiResponse('ok', 0, 'One photo deleted!');
+    }
+
+    @Post('search')
+    @UseGuards(RoleCheckedGuard)
+    @AllowToRoles('administrator', 'user')
+    async search(@Body() data: ArticleSearchDto): Promise<Article[] | ApiResponse> {
+        return await this.service.search(data);
     }
 }

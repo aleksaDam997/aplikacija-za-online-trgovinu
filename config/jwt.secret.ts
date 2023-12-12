@@ -1,4 +1,5 @@
-export const jwtSecret: string = 'asihd10832u0932urjfdsnfo2309ru'+
-                        'asojdiqhdoihwd09h32ohd9023h09fh'+
-                        'djqd32j-0djp43ojt09fj vm23=ro20=3'+
-                        'wqeoidjmcn949u30r9u2-349rjf dsj0932';
+export const jwtSecret: string = '87ry49ghboundfv948hgv984hvrnewjv594vh0i5v4n' +
+                                 '89rt0hidfnvg08hgubivdrfev97134g9fubvfreibv9' +
+                                 '-9834uhivnibhv8gv34hioqrne 8954y4q39t u8048' +
+                                 '9-7879tgfhbnj80t7gyvhibn0[8y954564t1rgegdf]' +
+                                 '0584yhuonvgfre8gh34hbg8tbhfvnpq98 g34q348yu';

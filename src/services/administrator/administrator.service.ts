@@ -1,81 +1,122 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Administrator } from 'src/entities/Administrator.entity';
+import { Administrator } from 'src/entities/administrator.entity';
 import { Repository } from 'typeorm';
 import { AddAdministratorDto } from 'src/dtos/administrator/add.administrator.dto';
 import { EditAdministratorDto } from 'src/dtos/administrator/edit.administrator.dto';
-import { ApiResponse } from 'misc/api.response.class';
+import { ApiResponse } from 'src/misc/api.response.class';
 import * as crypto from 'crypto';
+import { AdministratorToken } from 'src/entities/administrator-token.entity';
 
 @Injectable()
 export class AdministratorService {
+    constructor(
+       @InjectRepository(Administrator)
+       private readonly administrator: Repository<Administrator>,
 
-    constructor(     
-        @InjectRepository(Administrator)
-        private readonly administrator: Repository<Administrator>
-        ){
+       @InjectRepository(AdministratorToken)
+       private readonly administratorToken: Repository<AdministratorToken>,
+    ) { }
 
-    }
-
-    getAll(): Promise<Administrator[]>{
+    getAll(): Promise<Administrator[]> {
         return this.administrator.find();
     }
 
-    async getByUsername(username: string): Promise<Administrator | null>{
-        const admin = this.administrator.findOne({
+    async getByUsername(username: string): Promise<Administrator | null> {
+        const admin = await this.administrator.findOne({
             username: username
-            // naziv polja u bazi   |   argument
         });
 
-        if(admin){
+        if (admin) {
             return admin;
         }
 
         return null;
     }
 
-    getById(id: number): Promise<Administrator>{
+    getById(id: number): Promise<Administrator> {
         return this.administrator.findOne(id);
     }
 
-    add(data: AddAdministratorDto): Promise<Administrator | ApiResponse>{
-        // const crypto = require('crypto');
+    add(data: AddAdministratorDto): Promise<Administrator | ApiResponse> {
+        const passwordHash = crypto.createHash('sha512');
+        passwordHash.update(data.password);
+        const passwordHashString = passwordHash.digest('hex').toUpperCase();
 
-        const passwordhash = crypto.createHash('sha512');
-        passwordhash.update(data.password);
-        const passHashString = passwordhash.digest('hex').toUpperCase();
+        let newAdmin: Administrator = new Administrator();
+        newAdmin.username = data.username;
+        newAdmin.passwordHash = passwordHashString;
 
-        let admin: Administrator = new Administrator();
-        admin.username = data.username;
-        admin.passwordHash = passHashString;
-
-        return new Promise((resolve) =>{
-            this.administrator.save(admin)
-            .then(data => resolve(data)).catch(error =>{
-            const response = new ApiResponse('error', -1001);
-            resolve(response);
-            }); 
+        return new Promise((resolve) => {
+            this.administrator.save(newAdmin)
+            .then(data => resolve(data))
+            .catch(error => {
+                const response: ApiResponse = new ApiResponse("error", -1001);
+                resolve(response);
+            });
         });
-
     }
 
-    async editById(adminId: number, data: EditAdministratorDto): Promise<Administrator | ApiResponse>{
-        let admin: Administrator = await this.administrator.findOne(adminId);
+    async editById(id: number, data: EditAdministratorDto): Promise<Administrator | ApiResponse> {
+        let admin: Administrator = await this.administrator.findOne(id);
 
-        if(admin === undefined){
-            return new Promise((resolve) =>{
+        if (admin === undefined) {
+            return new Promise((resolve) => {
                 resolve(new ApiResponse("error", -1002));
-            })
+            });
         }
 
-        // const crypto = require('crypto');
-        const passHash = crypto.createHash('sha512');
-        passHash.update(data.password);
-        let passHashString: string = passHash.digest('hex').toUpperCase();
+        const passwordHash = crypto.createHash('sha512');
+        passwordHash.update(data.password);
+        const passwordHashString = passwordHash.digest('hex').toUpperCase();
 
-        admin.passwordHash = passHashString;
+        admin.passwordHash = passwordHashString;
 
         return this.administrator.save(admin);
-        // return this.administrator.update(id);
+    }
+
+    async addToken(administratorId: number, token: string, expiresAt: string) {
+        const administratorToken = new AdministratorToken();
+        administratorToken.administratorId = administratorId;
+        administratorToken.token = token;
+        administratorToken.expiresAt = expiresAt;
+
+        return await this.administratorToken.save(administratorToken);
+    }
+
+    async getAdministratorToken(token: string): Promise<AdministratorToken> {
+        return await this.administratorToken.findOne({
+            token: token,
+        });
+    }
+
+    async invalidateToken(token: string): Promise<AdministratorToken | ApiResponse> {
+        const administratorToken = await this.administratorToken.findOne({
+            token: token,
+        });
+
+        if (!administratorToken) {
+            return new ApiResponse("error", -10001, "No such refresh token!");
+        }
+
+        administratorToken.isValid = 0;
+
+        await this.administratorToken.save(administratorToken);
+
+        return await this.getAdministratorToken(token);
+    }
+
+    async invalidateAdministratorTokens(administratorId: number): Promise<(AdministratorToken | ApiResponse)[]> {
+        const administratorTokens = await this.administratorToken.find({
+            administratorId: administratorId,
+        });
+
+        const results = [];
+
+        for (const administratorToken of administratorTokens) {
+            results.push(this.invalidateToken(administratorToken.token));
+        }
+
+        return results;
     }
 }
